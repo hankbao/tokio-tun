@@ -148,10 +148,6 @@ impl Tun {
     pub fn poll_write_ready(&self) -> io::Result<Async<Ready>> {
         self.io.poll_write_ready()
     }
-
-    // fn io_mut(&mut self) -> &mut PollEvented2<platform::Tun> {
-    //     &mut self.io
-    // }
 }
 
 #[cfg(not(windows))]
