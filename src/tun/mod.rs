@@ -202,11 +202,14 @@ impl AsyncRead for Tun {
         let mut stack_buf = [0u8; 1600]; // TODO: Use MTU
         let read_result = self.io.read(&mut stack_buf);
         match read_result {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(Ready::readable())?;
-                Ok(Async::NotReady)
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.clear_read_ready(Ready::readable())?;
+                    Ok(Async::NotReady)
+                } else {
+                    Err(e)
+                }
             }
-            Err(e) => Err(e),
             Ok(bytes_read) => {
                 buf.put_slice(&stack_buf[0..bytes_read]);
                 Ok(Async::Ready(bytes_read))
@@ -228,14 +231,25 @@ impl AsyncWrite for Tun {
         let bytes: Bytes = buf.collect();
         let write_result = self.io.write(&bytes[..]);
         match write_result {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready()?;
-                Ok(Async::NotReady)
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.clear_write_ready()?;
+                    Ok(Async::NotReady)
+                } else {
+                    Err(e)
+                }
             }
-            Err(e) => Err(e),
             Ok(bytes_written) => {
                 buf.advance(bytes_written);
-                Ok(Async::Ready(bytes_written))
+
+                if bytes_written < bytes.len() {
+                    Err(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "failed to write packet to tun",
+                    ))
+                } else {
+                    Ok(Async::Ready(bytes_written))
+                }
             }
         }
     }
@@ -253,11 +267,14 @@ impl Stream for Tun {
         let mut buf = vec![0u8; 1600]; // TODO: Use MTU
         let read_result = self.io.read(&mut buf);
         match read_result {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_read_ready(Ready::readable())?;
-                Ok(Async::NotReady)
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.clear_read_ready(Ready::readable())?;
+                    Ok(Async::NotReady)
+                } else {
+                    Err(e)
+                }
             }
-            Err(e) => Err(e),
             Ok(bytes_read) => {
                 buf.truncate(bytes_read);
                 Ok(Async::Ready(Some(buf.into_boxed_slice())))
@@ -277,16 +294,24 @@ impl Sink for Tun {
 
         let write_result = self.io.write(&item[..]);
         match write_result {
-            Ok(0) => Err(io::Error::new(
-                io::ErrorKind::WriteZero,
-                "failed to write packet to interface",
-            )),
-            Ok(..) => Ok(AsyncSink::Ready),
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.io.clear_write_ready()?;
-                Ok(AsyncSink::NotReady(item))
+            Err(e) => {
+                if e.kind() == io::ErrorKind::WouldBlock {
+                    self.io.clear_write_ready()?;
+                    Ok(AsyncSink::NotReady(item))
+                } else {
+                    Err(e)
+                }
             }
-            Err(e) => Err(e),
+            Ok(bytes_written) => {
+                if bytes_written < item.len() {
+                    Err(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "failed to write packet to tun",
+                    ))
+                } else {
+                    Ok(AsyncSink::Ready)
+                }
+            }
         }
     }
 
