@@ -121,7 +121,7 @@ impl Tun {
         self.io.get_ref().set_addr(addr)
     }
 
-    // Set netmask of the Tun interface
+    /// Set netmask of the Tun interface
     #[cfg(not(windows))]
     pub fn set_netmask(&self, netmask: Ipv4Addr) -> io::Result<()> {
         self.io.get_ref().set_netmask(netmask)
@@ -133,18 +133,18 @@ impl Tun {
         self.io.get_ref().addr()
     }
 
-    // Get netmask of the Tun interface
+    /// Get netmask of the Tun interface
     #[cfg(not(windows))]
     pub fn netmask(&self) -> io::Result<Ipv4Addr> {
         self.io.get_ref().netmask()
     }
 
-    /// Poll Tun for read.
+    /// Poll Tun for read
     pub fn poll_read_ready_readable(&self) -> io::Result<Async<Ready>> {
         self.io.poll_read_ready(Ready::readable())
     }
 
-    /// Poll Tun for write.
+    /// Poll Tun for write
     pub fn poll_write_ready(&self) -> io::Result<Async<Ready>> {
         self.io.poll_write_ready()
     }
