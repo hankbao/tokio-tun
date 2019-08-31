@@ -17,8 +17,6 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(windows)]
 use ipnetwork::{IpNetwork, Ipv4Network};
 #[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, RawHandle};
-#[cfg(windows)]
 use winapi::shared::guiddef::GUID;
 
 use crate::try_nb;
@@ -160,13 +158,6 @@ impl Tun {
 impl AsRawFd for Tun {
     fn as_raw_fd(&self) -> RawFd {
         self.io.get_ref().as_raw_fd()
-    }
-}
-
-#[cfg(windows)]
-impl AsRawHandle for Tun {
-    fn as_raw_handle(&self) -> RawHandle {
-        self.io.get_ref().as_raw_handle()
     }
 }
 
