@@ -87,7 +87,7 @@ impl Tun {
 
     /// New Tun to the existing event pool.
     #[cfg(windows)]
-    pub fn new(ifname: String, description: String, requested_guid: &GUID) -> io::Result<Tun> {
+    pub fn new(ifname: String, description: String, requested_guid: GUID) -> io::Result<Tun> {
         Tun::from_tun(platform::Tun::new(ifname, description, requested_guid)?)
     }
 
