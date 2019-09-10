@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::{self, Read, Write};
 
 use bytes::{Buf, BufMut, Bytes};
-use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use mio::Ready;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::reactor::PollEvented2;
@@ -194,14 +194,8 @@ impl AsyncRead for Tun {
         false
     }
 
-    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_read_ready(Ready::readable())? {
-            return Ok(Async::NotReady);
-        }
-
-        let mut stack_buf = [0u8; 1600]; // TODO: Use MTU
-        let read_result = self.io.read(&mut stack_buf);
-        match read_result {
+    fn poll_read(&mut self, buf: &mut [u8]) -> Poll<usize, io::Error> {
+        match self.read(buf) {
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
                     self.io.clear_read_ready(Ready::readable())?;
@@ -210,11 +204,27 @@ impl AsyncRead for Tun {
                     Err(e)
                 }
             }
-            Ok(bytes_read) => {
-                buf.put_slice(&stack_buf[0..bytes_read]);
-                Ok(Async::Ready(bytes_read))
-            }
+            Ok(t) => Ok(Async::Ready(t)),
         }
+    }
+
+    fn read_buf<B: BufMut>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        if let Async::NotReady = self.io.poll_read_ready(Ready::readable())? {
+            return Ok(Async::NotReady);
+        }
+
+        if !buf.has_remaining_mut() {
+            return Ok(Async::Ready(0));
+        }
+
+        let mut stack_buf = [0u8; 1600]; // TODO: Use MTU
+        let bytes_read = try_ready!(self.poll_read(&mut stack_buf));
+        if bytes_read > buf.remaining_mut() {
+            return Ok(Async::Ready(0));
+        }
+
+        buf.put_slice(&stack_buf[0..bytes_read]);
+        Ok(Async::Ready(bytes_read))
     }
 }
 
@@ -223,14 +233,8 @@ impl AsyncWrite for Tun {
         Ok(().into())
     }
 
-    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
-        if let Async::NotReady = self.io.poll_write_ready()? {
-            return Ok(Async::NotReady);
-        }
-
-        let bytes: Bytes = buf.collect();
-        let write_result = self.io.write(&bytes[..]);
-        match write_result {
+    fn poll_write(&mut self, buf: &[u8]) -> Poll<usize, io::Error> {
+        match self.write(buf) {
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
                     self.io.clear_write_ready()?;
@@ -239,18 +243,30 @@ impl AsyncWrite for Tun {
                     Err(e)
                 }
             }
-            Ok(bytes_written) => {
-                buf.advance(bytes_written);
+            Ok(t) => Ok(Async::Ready(t)),
+        }
+    }
 
-                if bytes_written < bytes.len() {
-                    Err(io::Error::new(
-                        io::ErrorKind::WriteZero,
-                        "failed to write packet to tun",
-                    ))
-                } else {
-                    Ok(Async::Ready(bytes_written))
-                }
-            }
+    fn write_buf<B: Buf>(&mut self, buf: &mut B) -> Poll<usize, io::Error> {
+        if let Async::NotReady = self.io.poll_write_ready()? {
+            return Ok(Async::NotReady);
+        }
+
+        if !buf.has_remaining() {
+            return Ok(Async::Ready(0));
+        }
+
+        let bytes: Bytes = buf.collect();
+        let bytes_written = try_ready!(self.poll_write(&bytes[..]));
+        buf.advance(bytes_written);
+
+        if bytes_written < bytes.len() {
+            Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "failed to write packet to tun",
+            ))
+        } else {
+            Ok(Async::Ready(bytes_written))
         }
     }
 }
