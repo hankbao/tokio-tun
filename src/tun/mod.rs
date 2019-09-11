@@ -17,6 +17,8 @@ use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(windows)]
 use ipnetwork::{IpNetwork, Ipv4Network};
 #[cfg(windows)]
+use mio_wintun::luid::Luid;
+#[cfg(windows)]
 use winapi::shared::guiddef::GUID;
 
 use crate::try_nb;
@@ -113,6 +115,12 @@ impl Tun {
     #[cfg(windows)]
     pub fn addr(&self) -> io::Result<IpNetwork> {
         self.io.get_ref().addr()
+    }
+
+    /// Get luid of the Tun interface
+    #[cfg(windows)]
+    pub fn luid(&self) -> Luid {
+        self.io.get_ref().luid()
     }
 
     /// Set address of the Tun interface
