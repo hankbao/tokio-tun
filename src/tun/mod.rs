@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::net::Ipv4Addr;
 
 use bytes::{Buf, BufMut, Bytes};
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend, Stream};
@@ -10,14 +11,14 @@ use tokio::reactor::PollEvented2;
 #[cfg(not(windows))]
 use nix::libc::{c_char, c_short, sockaddr};
 #[cfg(not(windows))]
-use std::net::Ipv4Addr;
-#[cfg(not(windows))]
 use std::os::unix::io::{AsRawFd, RawFd};
 
 #[cfg(windows)]
 use ipnetwork::{IpNetwork, Ipv4Network};
 #[cfg(windows)]
 use mio_wintun::luid::Luid;
+#[cfg(windows)]
+use std::net::IpAddr;
 #[cfg(windows)]
 use winapi::shared::guiddef::GUID;
 
@@ -115,6 +116,14 @@ impl Tun {
     #[cfg(windows)]
     pub fn addr(&self) -> io::Result<IpNetwork> {
         self.io.get_ref().addr()
+    }
+
+    /// Set dns servers for the Tun interface
+    #[cfg(windows)]
+    pub fn set_dns(&mut self, dns_servers: Vec<Ipv4Addr>) -> io::Result<()> {
+        self.io
+            .get_mut()
+            .set_dns(dns_servers.iter().map(|addr| IpAddr::V4(*addr)).collect())
     }
 
     /// Get luid of the Tun interface
