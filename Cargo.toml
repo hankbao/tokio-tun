@@ -13,12 +13,12 @@ ipnetwork = "0.14"
 byteorder = "1.3"
 bytes = "0.4"
 futures = "0.1"
-mio = "0.6"
-tokio = "0.1"
+mio = { git = "https://github.com/hankbao/mio", branch = "v0.6.x-windows" }
+tokio = { git = "https://github.com/hankbao/tokio.git", branch = "v0.1.x-windows" }
 
 [target.'not(cfg(windows))'.dependencies]
 nix = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { git = "https://github.com/hankbao/winapi-rs.git", branch = "iphlpapi-support" }
-mio-wintun = { git = "https://github.com/hankbao/mio-wintun", branch = "master" }
+mio-wintun = { git = "https://github.com/hankbao/mio-wintun", branch = "custom" }
